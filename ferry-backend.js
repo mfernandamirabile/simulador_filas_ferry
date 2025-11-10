@@ -156,7 +156,7 @@ class Embarcacao {
     veiculosEmbarcar.forEach(veiculo => {
       veiculo.horarioEmbarque = horarioAtual;
       // Wq = Tempo de espera na fila
-      veiculo.tempoEspera = horarioAtual - veiculo.horarioChegada;
+      veiculo.tempoEspera = Math.max(0, horarioAtual - veiculo.horarioChegada);
       this.veiculosAbordo.push(veiculo);
     });
     
@@ -233,271 +233,171 @@ class SimuladorFerries {
     
     // Inicializa estruturas do sistema de filas
     this.embarcacoes = [];           // Servidores (c)
-    this.fila = [];                  // Fila de espera (Lq)
     this.veiculosProcessados = [];   // Histórico de atendimentos
     this.eventos = [];               // Log de eventos da simulação
     this.horarioAtual = this.config.horarioInicio * 60; // Tempo em minutos
-    this.reservas = [];              // Sistema de reservas antecipadas
+    
+    // Filas separadas
+    this.filaReservas = [];          // Veículos com reserva
+    this.filaNormais = [];           // Veículos sem reserva
     
     // Cria os c servidores (embarcações)
     for (let i = 0; i < this.config.numEmbarcacoes; i++) {
       this.embarcacoes.push(new Embarcacao(i + 1));
     }
   }
-  
-  /*
-  MÉTODO: VERIFICAR HORÁRIO DE PICO
-  
-  TEORIA DE FILAS - VARIAÇÃO DA TAXA λ:
-  Durante horários de pico, a taxa de chegada λ aumenta significativamente.
-  Isso causa:
-  - Aumento de Lq (tamanho da fila)
-  - Aumento de Wq (tempo de espera)
-  - Possível saturação do sistema (ρ > 1)
-  */
+
+  // --- Verifica se é horário de pico ---
   ehHorarioPico(horario) {
     const hora = Math.floor(horario / 60);
     return this.config.picos.some(pico => hora >= pico.inicio && hora < pico.fim);
   }
-  
-  /*
-  MÉTODO: GERAR CHEGADAS DE VEÍCULOS
-  
-  PROCESSO DE POISSON:
-  Simula chegadas aleatórias seguindo distribuição de Poisson.
-  - λ_normal: veiculosHora base
-  - λ_pico: veiculosHora * 2.5 (multiplicador de pico)
-  
-  EXEMPLO:
-  - 1200 veículos/dia ÷ 16 horas = 75 veículos/hora
-  - No pico: 75 × 2.5 = 187.5 veículos/hora
-  */
+
+  // --- Gera chegadas de veículos ---
   gerarChegadaVeiculos() {
-    const veiculosHora = this.config.veiculosDiarios / this.config.horasOperacao;
+    const veiculosHoraBase = this.config.veiculosDiarios / this.config.horasOperacao;
     const multiplicadorPico = this.ehHorarioPico(this.horarioAtual) ? 2.5 : 1;
-    const veiculosEstaHora = Math.round(veiculosHora * multiplicadorPico);
-    
+
+    // Gera chegadas com flutuação aleatória (±20%)
+    const fatorAleatorio = 0.8 + Math.random() * 0.4;
+    const veiculosEstaHora = Math.round(veiculosHoraBase * multiplicadorPico * fatorAleatorio);
+
     const veiculos = [];
     for (let i = 0; i < veiculosEstaHora; i++) {
-      // Chegada aleatória dentro da hora
       const minutoChegada = this.horarioAtual + Math.random() * 60;
-      
-      // Define tipo baseado na proporção 80/20
       const tipo = Math.random() < this.config.percentualCarros ? 'carro' : 'caminhao';
       veiculos.push(new Veiculo(tipo, minutoChegada));
     }
-    
-    // Ordena por horário de chegada (FIFO - First In First Out)
+
     return veiculos.sort((a, b) => a.horarioChegada - b.horarioChegada);
   }
-  
-  /*
-  MÉTODO PRINCIPAL: PROCESSAR SIMULAÇÃO
-  
-  SIMULAÇÃO DE EVENTOS DISCRETOS:
-  Avança o tempo em intervalos e processa eventos:
-  1. Chegadas de veículos (entrada no sistema)
-  2. Embarques (início do atendimento)
-  3. Travessias (processamento)
-  4. Desembarques (saída do sistema)
-  5. Manutenções e falhas
-  
-  MÉTRICAS DE TEORIA DE FILAS CALCULADAS:
-  - Lq: Tamanho médio da fila
-  - Wq: Tempo médio de espera
-  - ρ: Utilização dos servidores
-  - Taxa de throughput
-  */
+
+
+  // --- Processa simulação com filas de prioridade ---
   processar() {
-    const resultados = {
-      tempoSimulacao: 0,
-      veiculosProcessados: 0,
-      veiculosEmFila: 0,
-      tempoMedioEspera: 0,         // Wq médio
-      tempoMaximoEspera: 0,         // Wq máximo
-      utilizacaoEmbarcacoes: [],    // ρ por servidor
-      viagensRealizadas: 0,
-      eventos: []
-    };
-    
-    const horarioFinal = this.config.horarioFim * 60;
-    
-    // LOOP PRINCIPAL DA SIMULAÇÃO
-    while (this.horarioAtual < horarioFinal) {
-      
-      // ========== EVENTO 1: CHEGADAS DE VEÍCULOS ==========
-      // Implementa o processo de Poisson (chegadas aleatórias)
-      const novosVeiculos = this.gerarChegadaVeiculos();
-      this.fila.push(...novosVeiculos); // Adiciona à fila
-      
-      if (novosVeiculos.length > 0) {
-        this.eventos.push({
-          tipo: 'chegada',
-          horario: this.horarioAtual,
-          quantidade: novosVeiculos.length,
-          filaTotal: this.fila.length    // Lq atual
-        });
+  const resultados = {
+    tempoSimulacao: 0,
+    veiculosProcessados: 0,
+    veiculosNaoAtendidos: 0,
+    tempoMedioEspera: 0,
+    tempoMedioEsperaReservas: 0,
+    tempoMedioEsperaNormais: 0,
+    utilizacaoEmbarcacoes: [],
+    viagensRealizadas: 0
+  };
+
+  const horarioFinal = this.config.horarioFim * 60;
+
+  // === Loop principal da simulação ===
+  while (this.horarioAtual < horarioFinal) {
+    // === 1️⃣ Geração de chegadas (aleatória e realista) ===
+    const veiculosHoraBase = this.config.veiculosDiarios / this.config.horasOperacao;
+    const multiplicadorPico = this.ehHorarioPico(this.horarioAtual) ? 2.5 : 1;
+
+    // Variação natural (±20%) para simular dias mais/menos movimentados
+    const fatorAleatorio = 0.8 + Math.random() * 0.4;
+    const veiculosEstaHora = Math.round(veiculosHoraBase * multiplicadorPico * fatorAleatorio);
+
+    // Cria os veículos dessa hora
+    const novosVeiculos = [];
+    for (let i = 0; i < veiculosEstaHora; i++) {
+      const minutoChegada = this.horarioAtual + Math.random() * 60;
+      const tipo = Math.random() < this.config.percentualCarros ? 'carro' : 'caminhao';
+      const veiculo = new Veiculo(tipo, minutoChegada);
+
+      // Define se o veículo tem reserva (30% por padrão)
+      veiculo.reserva = Math.random() < (this.config.percentualReservas || 0.3);
+
+      // 🔹 Penaliza veículos sem reserva em horários de pico
+      if (!veiculo.reserva && this.ehHorarioPico(this.horarioAtual)) {
+        veiculo.tempoEspera += 15 + Math.random() * 20; // espera adicional de 15–35 min
       }
-      
-      // ========== EVENTO 2 e 3: PROCESSAR EMBARCAÇÕES ==========
-      this.embarcacoes.forEach(embarcacao => {
-        
-        // Verifica necessidade de manutenção programada
-        if (embarcacao.necessitaManutencao(this.horarioAtual)) {
-          embarcacao.iniciarManutencao(this.horarioAtual);
-          this.eventos.push({
-            tipo: 'manutencao_inicio',
-            embarcacao: embarcacao.id,
-            horario: this.horarioAtual
-          });
-        }
-        
-        // Servidor em manutenção (downtime)
-        if (embarcacao.emManutencao) {
-          if (this.horarioAtual >= embarcacao.ultimaManutencao + this.config.manutencaoHoras * 60) {
-            embarcacao.finalizarManutencao(this.horarioAtual);
-            this.eventos.push({
-              tipo: 'manutencao_fim',
-              embarcacao: embarcacao.id,
-              horario: this.horarioAtual
-            });
-          }
-          return; // Pula para próxima embarcação
-        }
-        
-        // Simula falha não programada (5% de chance)
-        if (Math.random() < this.config.taxaFalhas / 1000) {
-          embarcacao.disponivel = false;
-          this.eventos.push({
-            tipo: 'falha',
-            embarcacao: embarcacao.id,
-            horario: this.horarioAtual
-          });
-          // Reparo leva 30 minutos
-          setTimeout(() => embarcacao.disponivel = true, 30);
-          return;
-        }
-        
-        // ========== INÍCIO DO ATENDIMENTO ==========
-        // Condições: servidor disponível E fila não vazia E servidor vazio
-        if (embarcacao.disponivel && this.fila.length > 0 && embarcacao.veiculosAbordo.length === 0) {
-          
-          // Embarque de veículos (início do serviço)
-          const embarcados = embarcacao.embarcar(this.fila, this.horarioAtual);
-          this.fila.splice(0, embarcados); // Remove da fila (Lq diminui)
-          
-          this.eventos.push({
-            tipo: 'embarque',
-            embarcacao: embarcacao.id,
-            horario: this.horarioAtual,
-            veiculos: embarcados,
-            filaRestante: this.fila.length
-          });
-          
-          // Simula travessia (tempo de serviço)
-          const horarioDesembarque = this.horarioAtual + this.config.tempoTravessiaMinutos;
-          const veiculosDesembarcados = embarcacao.desembarcar(horarioDesembarque);
-          this.veiculosProcessados.push(...veiculosDesembarcados);
-          
-          // Atualiza utilização do servidor (ρ)
-          embarcacao.tempoTotalOcupado += this.config.tempoTravessiaMinutos;
-          
-          this.eventos.push({
-            tipo: 'desembarque',
-            embarcacao: embarcacao.id,
-            horario: horarioDesembarque,
-            veiculos: veiculosDesembarcados.length
-          });
-        }
-      });
-      
-      // Avança o tempo da simulação
-      this.horarioAtual += this.config.frequenciaSaidaMinutos;
+
+      novosVeiculos.push(veiculo);
+
     }
-    
-    // ========== CÁLCULO DAS MÉTRICAS FINAIS ==========
-    
-    resultados.tempoSimulacao = (horarioFinal - (this.config.horarioInicio * 60)) / 60;
-    resultados.veiculosProcessados = this.veiculosProcessados.length;
-    resultados.veiculosEmFila = this.fila.length; // Lq final
-    
-    // Wq - Tempo médio de espera na fila
-    const temposEspera = this.veiculosProcessados.map(v => v.tempoEspera);
-    resultados.tempoMedioEspera = temposEspera.length > 0 
-      ? temposEspera.reduce((a, b) => a + b, 0) / temposEspera.length 
-      : 0;
-    
-    resultados.tempoMaximoEspera = temposEspera.length > 0 
-      ? Math.max(...temposEspera) 
-      : 0;
-    
-    // ρ - Taxa de utilização dos servidores
-    const tempoTotalSimulacao = horarioFinal - (this.config.horarioInicio * 60);
-    resultados.utilizacaoEmbarcacoes = this.embarcacoes.map(emb => ({
-      id: emb.id,
-      // ρ = tempo_ocupado / tempo_total
-      percentualUtilizacao: (emb.tempoTotalOcupado / tempoTotalSimulacao) * 100,
-      viagensRealizadas: emb.viagensRealizadas
-    }));
-    
-    resultados.viagensRealizadas = this.embarcacoes.reduce((total, emb) => 
-      total + emb.viagensRealizadas, 0);
-    
-    resultados.eventos = this.eventos;
-    
-    return resultados;
-  }
-  
-  /*
-  MÉTODO: SIMULAR COM SISTEMA DE RESERVAS
-  
-  IMPACTO NA TEORIA DE FILAS:
-  O sistema de reservas altera o padrão de chegadas:
-  - Reduz picos (λ_pico diminui)
-  - Distribui chegadas mais uniformemente
-  - Diminui Lq e Wq
-  - Melhora utilização ρ dos servidores
-  
-  RESULTADO ESPERADO:
-  - Menor tempo de espera (Wq)
-  - Fila menor (Lq)
-  - Melhor eficiência operacional
-  */
-  simularComReservas(percentualReservas = 0.3) {
-    // Simula sem reservas primeiro (baseline)
-    const resultadoSemReservas = this.processar();
-    
-    // Reset para segunda simulação
-    this.horarioAtual = this.config.horarioInicio * 60;
-    this.fila = [];
-    this.veiculosProcessados = [];
-    this.eventos = [];
-    this.embarcacoes.forEach((emb, i) => {
-      this.embarcacoes[i] = new Embarcacao(i + 1);
+    // Distribui veículos nas filas
+    novosVeiculos.forEach(v => {
+      if (v.reserva) this.filaReservas.push(v);
+      else this.filaNormais.push(v);
     });
-    
-    // Com reservas: reduz intensidade dos picos
-    const configComReservas = {
-      ...this.config,
-      percentualPico: this.config.percentualPico * (1 - percentualReservas)
-    };
-    
-    const simuladorComReservas = new SimuladorFerries(configComReservas);
-    const resultadoComReservas = simuladorComReservas.processar();
-    
-    // Calcula melhorias obtidas
-    return {
-      semReservas: resultadoSemReservas,
-      comReservas: resultadoComReservas,
-      melhorias: {
-        reducaoTempoEspera: ((resultadoSemReservas.tempoMedioEspera - resultadoComReservas.tempoMedioEspera) / resultadoSemReservas.tempoMedioEspera * 100).toFixed(2) + '%',
-        reducaoFila: resultadoSemReservas.veiculosEmFila - resultadoComReservas.veiculosEmFila,
-        melhoriaUtilizacao: (resultadoComReservas.utilizacaoEmbarcacoes.reduce((acc, emb) => 
-          acc + emb.percentualUtilizacao, 0) / resultadoComReservas.utilizacaoEmbarcacoes.length).toFixed(2) + '%'
+
+    // === 2️⃣ Embarque por embarcação ===
+    for (const embarcacao of this.embarcacoes) {
+      if (embarcacao.disponivel && embarcacao.veiculosAbordo.length === 0) {
+        // --- Prioridade de embarque para reservas ---
+        const prontosReservas = this.filaReservas.filter(v => v.horarioChegada <= this.horarioAtual);
+        const embarcadosReservas = embarcacao.embarcar(prontosReservas, this.horarioAtual);
+        this.filaReservas.splice(0, embarcadosReservas);
+
+        // --- Embarque normal (com pequeno atraso de fila) ---
+        const espacoRestante = embarcacao.capacidade - embarcacao.veiculosAbordo.length;
+        if (espacoRestante > 0) {
+          const prontosNormais = this.filaNormais.filter(v => v.horarioChegada <= this.horarioAtual);
+          // Simula atraso adicional de 10 min para fila sem reserva
+          const embarcadosNormais = embarcacao.embarcar(prontosNormais, this.horarioAtual + 10);
+          this.filaNormais.splice(0, embarcadosNormais);
+        }
+
+        // --- Travessia e desembarque ---
+        const horarioDesembarque = this.horarioAtual + this.config.tempoTravessiaMinutos;
+        const desembarcados = embarcacao.desembarcar(horarioDesembarque);
+        this.veiculosProcessados.push(...desembarcados);
+        embarcacao.viagensRealizadas++;
+        embarcacao.tempoTotalOcupado += this.config.tempoTravessiaMinutos;
       }
+    }
+
+    // Avança o tempo (1 saída por hora)
+    this.horarioAtual += this.config.frequenciaSaidaMinutos;
+  }
+
+  // === 3️⃣ Cálculo de resultados ===
+  const todos = this.veiculosProcessados;
+  const reservas = todos.filter(v => v.reserva);
+  const normais = todos.filter(v => !v.reserva);
+  const media = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+
+  // Fila restante ao final do dia (veículos não atendidos)
+  resultados.veiculosNaoAtendidos = this.filaReservas.length + this.filaNormais.length;
+
+  resultados.tempoSimulacao = (horarioFinal - (this.config.horarioInicio * 60)) / 60;
+  resultados.veiculosProcessados = todos.length;
+  resultados.tempoMedioEspera = media(todos.map(v => v.tempoEspera));
+  resultados.tempoMedioEsperaReservas = media(reservas.map(v => v.tempoEspera));
+  resultados.tempoMedioEsperaNormais = media(normais.map(v => v.tempoEspera));
+
+  resultados.utilizacaoEmbarcacoes = this.embarcacoes.map(e => ({
+    id: e.id,
+    percentualUtilizacao: Math.min(100, (e.tempoTotalOcupado / (horarioFinal - this.config.horarioInicio * 60)) * 100),
+    viagensRealizadas: e.viagensRealizadas
+  }));
+
+  resultados.viagensRealizadas = this.embarcacoes.reduce((s, e) => s + e.viagensRealizadas, 0);
+
+  return resultados;
+}
+
+
+  // --- Simular com sistema de reservas (comparativo de desempenho) ---
+  simularComReservas(percentualReservas = 0.3) {
+    this.config.percentualReservas = percentualReservas;
+    const resultado = this.processar();
+
+    return {
+      sucesso: true,
+      resumo: {
+        tempoMedioEsperaGeral: resultado.tempoMedioEspera.toFixed(2) + " min",
+        tempoMedioReservas: resultado.tempoMedioEsperaReservas.toFixed(2) + " min",
+        tempoMedioNormais: resultado.tempoMedioEsperaNormais.toFixed(2) + " min",
+        diferenca: (resultado.tempoMedioEsperaNormais - resultado.tempoMedioEsperaReservas).toFixed(2) + " min",
+        veiculosProcessados: resultado.veiculosProcessados
+      },
+      detalhes: resultado
     };
   }
 }
+
 
 // ============================================================================
 // ENDPOINTS DA API REST
@@ -602,13 +502,15 @@ app.post('/simular/com-reservas', (req, res) => {
     
     res.json({
       sucesso: true,
-      resultados,
-      configuracaoUsada: simulador.config,
       percentualReservasSimulado: percentualReservas,
+      resumo: resultados.resumo,
+      detalhes: resultados.detalhes,
+      configuracaoUsada: simulador.config,
       analise: {
-        reducaoEspera: resultados.melhorias.reducaoTempoEspera,
-        reducaoFila: resultados.melhorias.reducaoFila + ' veículos',
-        eficiencia: resultados.melhorias.melhoriaUtilizacao
+        mensagem: "Comparativo entre usuários com e sem reserva",
+        diferencaTempo: resultados.resumo.diferenca,
+        tempoMedioComReserva: resultados.resumo.tempoMedioReservas,
+        tempoMedioSemReserva: resultados.resumo.tempoMedioNormais
       }
     });
   } catch (error) {
@@ -618,6 +520,7 @@ app.post('/simular/com-reservas', (req, res) => {
     });
   }
 });
+
 
 // ========== ENDPOINT 5: STATUS DAS EMBARCAÇÕES ==========
 /*
@@ -934,7 +837,9 @@ setSimuladorClasse(SimuladorFerries);
 
 app.get("/relatorios", (req, res) => {
   const resultado = GeradorRelatorios.gerarRelatorio();
-  res.json(resultado);
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(resultado, null, 2));
+
 });
 
 
@@ -963,6 +868,7 @@ app.listen(PORT, () => {
      GET  /embarcacoes/status        - Status das embarcações
      POST /reserva                   - Criar reserva
      GET  /reservas                  - Listar reservas
+     GET  /relatorios                - Traz relatórios de análises
      POST /relatar-problema          - Relatar problema ⭐ NOVO
      GET  /problemas                 - Listar problemas ⭐ NOVO
   

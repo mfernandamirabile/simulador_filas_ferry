@@ -20,7 +20,8 @@ class GeradorRelatorios {
 
       // Executa simulação com reservas (30%)
       const simuladorComReserva = new SimuladorFerries();
-      const resultadoComReserva = simuladorComReserva.simularComReservas(0.3).comReservas;
+      const resultadoComReserva = simuladorComReserva.simularComReservas(0.3).detalhes;
+
 
       // --- Cálculos de médias e comparações reais ---
       const tempoMedioSem = Math.max(0, resultadoSemReserva.tempoMedioEspera);
@@ -38,7 +39,7 @@ class GeradorRelatorios {
       const relatorio = {
         dataGeracao: new Date().toLocaleString("pt-BR"),
         resumoGeral: {
-          tempoMedioEspera: `${tempoMedioSem.toFixed(2)} min`,
+          tempoMedioEsperaSemReserva: `${tempoMedioSem.toFixed(2)} min`,
           veiculosProcessados: resultadoSemReserva.veiculosProcessados,
           utilizacaoMedia: `${utilizacaoMediaSem.toFixed(2)}%`,
           viagensRealizadas: resultadoSemReserva.viagensRealizadas,
