@@ -237,9 +237,8 @@ class SimuladorFerries {
     this.eventos = [];               // Log de eventos da simulação
     this.horarioAtual = this.config.horarioInicio * 60; // Tempo em minutos
     
-    // Filas separadas
-    this.filaReservas = [];          // Veículos com reserva
-    this.filaNormais = [];           // Veículos sem reserva
+    // Fila única
+    this.filaGeral = [];     
     
     // Cria os c servidores (embarcações)
     for (let i = 0; i < this.config.numEmbarcacoes; i++) {
@@ -316,29 +315,21 @@ class SimuladorFerries {
       novosVeiculos.push(veiculo);
 
     }
-    // Distribui veículos nas filas
-    novosVeiculos.forEach(v => {
-      if (v.reserva) this.filaReservas.push(v);
-      else this.filaNormais.push(v);
-    });
+    // Adiciona todos na mesma fila
+    this.filaGeral.push(...novosVeiculos);
 
     // === 2️⃣ Embarque por embarcação ===
     for (const embarcacao of this.embarcacoes) {
       if (embarcacao.disponivel && embarcacao.veiculosAbordo.length === 0) {
-        // --- Prioridade de embarque para reservas ---
-        const prontosReservas = this.filaReservas.filter(v => v.horarioChegada <= this.horarioAtual);
-        const embarcadosReservas = embarcacao.embarcar(prontosReservas, this.horarioAtual);
-        this.filaReservas.splice(0, embarcadosReservas);
+        // --- Embarque considerando prioridade de reserva ---
+        const prontos = this.filaGeral
+          .filter(v => v.horarioChegada <= this.horarioAtual)
+          .sort((a, b) => (b.reserva === true) - (a.reserva === true)); // com reserva primeiro
 
-        // --- Embarque normal (com pequeno atraso de fila) ---
-        const espacoRestante = embarcacao.capacidade - embarcacao.veiculosAbordo.length;
-        if (espacoRestante > 0) {
-          const prontosNormais = this.filaNormais.filter(v => v.horarioChegada <= this.horarioAtual);
-          // Simula atraso adicional de 10 min para fila sem reserva
-          const embarcadosNormais = embarcacao.embarcar(prontosNormais, this.horarioAtual + 10);
-          this.filaNormais.splice(0, embarcadosNormais);
-        }
+        const embarcados = embarcacao.embarcar(prontos, this.horarioAtual);
+        this.filaGeral.splice(0, embarcados);
 
+        
         // --- Travessia e desembarque ---
         const horarioDesembarque = this.horarioAtual + this.config.tempoTravessiaMinutos;
         const desembarcados = embarcacao.desembarcar(horarioDesembarque);
@@ -359,7 +350,7 @@ class SimuladorFerries {
   const media = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
 
   // Fila restante ao final do dia (veículos não atendidos)
-  resultados.veiculosNaoAtendidos = this.filaReservas.length + this.filaNormais.length;
+  resultados.veiculosNaoAtendidos = this.filaGeral.length;
 
   resultados.tempoSimulacao = (horarioFinal - (this.config.horarioInicio * 60)) / 60;
   resultados.veiculosProcessados = todos.length;
