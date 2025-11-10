@@ -1,0 +1,299 @@
+# 📋 EXEMPLOS DE JSON PARA TESTAR NO THUNDER CLIENT
+
+## ═══════════════════════════════════════════════════════════
+## 1. EXECUTAR SIMULAÇÃO BÁSICA
+## ═══════════════════════════════════════════════════════════
+## Endpoint: POST http://localhost:3000/simular
+
+### Exemplo 1.1 - Simulação padrão (pode deixar vazio)
+{}
+
+### Exemplo 1.2 - Simulação customizada
+{
+  "numEmbarcacoes": 4,
+  "capacidadeVeiculos": 50,
+  "veiculosDiarios": 1200,
+  "tempoTravessiaMinutos": 80
+}
+
+### Exemplo 1.3 - Teste com mais embarcações
+{
+  "numEmbarcacoes": 6,
+  "capacidadeVeiculos": 50,
+  "veiculosDiarios": 1500
+}
+
+### Exemplo 1.4 - Teste com alta demanda
+{
+  "numEmbarcacoes": 4,
+  "veiculosDiarios": 2000
+}
+
+
+## ═══════════════════════════════════════════════════════════
+## 2. SIMULAR COM SISTEMA DE RESERVAS
+## ═══════════════════════════════════════════════════════════
+## Endpoint: POST http://localhost:3000/simular/com-reservas
+
+### Exemplo 2.1 - Reservas 30%
+{
+  "percentualReservas": 0.3
+}
+
+### Exemplo 2.2 - Reservas 50%
+{
+  "percentualReservas": 0.5,
+  "numEmbarcacoes": 4,
+  "veiculosDiarios": 1200
+}
+
+### Exemplo 2.3 - Teste impacto reservas com alta demanda
+{
+  "percentualReservas": 0.4,
+  "veiculosDiarios": 1800
+}
+
+
+## ═══════════════════════════════════════════════════════════
+## 3. CRIAR RESERVA DE VEÍCULO
+## ═══════════════════════════════════════════════════════════
+## Endpoint: POST http://localhost:3000/reserva
+
+### Exemplo 3.1 - Reserva de carro
+{
+  "nomeUsuario": "Eduardo Silva",
+  "tipoVeiculo": "carro",
+  "horarioPreferencia": "08:00",
+  "telefone": "(98) 99999-8888",
+  "placa": "ABC-1234"
+}
+
+### Exemplo 3.2 - Reserva de caminhão
+{
+  "nomeUsuario": "José Motorista",
+  "tipoVeiculo": "caminhao",
+  "horarioPreferencia": "14:30",
+  "telefone": "(98) 98765-4321",
+  "placa": "XYZ-9876"
+}
+
+### Exemplo 3.3 - Reserva horário de pico manhã
+{
+  "nomeUsuario": "Maria Santos",
+  "tipoVeiculo": "carro",
+  "horarioPreferencia": "07:30",
+  "telefone": "(98) 91234-5678"
+}
+
+### Exemplo 3.4 - Reserva horário de pico tarde
+{
+  "nomeUsuario": "Carlos Souza",
+  "tipoVeiculo": "caminhao",
+  "horarioPreferencia": "17:00",
+  "telefone": "(98) 98888-7777",
+  "placa": "DEF-5555"
+}
+
+
+## ═══════════════════════════════════════════════════════════
+## 4. RELATAR PROBLEMA ⭐ NOVO
+## ═══════════════════════════════════════════════════════════
+## Endpoint: POST http://localhost:3000/relatar-problema
+
+### Exemplo 4.1 - Atraso excessivo (PRIORIDADE MÉDIA)
+{
+  "categoria": "Atraso excessivo",
+  "descricao": "Estou esperando há mais de 2 horas na fila. A última embarcação saiu há 1h30 e ainda não retornou. Há cerca de 80 veículos aguardando.",
+  "nomeUsuario": "João da Silva",
+  "telefone": "(98) 99876-5432",
+  "email": "joao.silva@email.com",
+  "localizacao": "Terminal Ponta da Espera"
+}
+
+### Exemplo 4.2 - Embarcação com defeito (PRIORIDADE ALTA)
+{
+  "categoria": "Embarcação com defeito",
+  "descricao": "A embarcação número 2 está com problemas no motor. Está fazendo barulhos estranhos e fumaça preta. Operação foi interrompida.",
+  "nomeUsuario": "Pedro Alves",
+  "telefone": "(98) 98765-1234",
+  "email": "pedro.alves@email.com",
+  "localizacao": "Em trânsito - Ferry 2"
+}
+
+### Exemplo 4.3 - Problema de segurança (PRIORIDADE ALTA)
+{
+  "categoria": "Segurança",
+  "descricao": "Não há colete salva-vidas suficientes na embarcação 3. Contei apenas 30 coletes para capacidade de 50 veículos com passageiros.",
+  "nomeUsuario": "Ana Costa",
+  "telefone": "(98) 97654-3210",
+  "email": "ana.costa@email.com",
+  "localizacao": "Ferry 3"
+}
+
+### Exemplo 4.4 - Fila desorganizada (PRIORIDADE MÉDIA)
+{
+  "categoria": "Fila desorganizada",
+  "descricao": "Não há sinalização adequada para organizar a fila. Veículos estão entrando fora de ordem e causando confusão. Funcionários não estão orientando corretamente.",
+  "nomeUsuario": "Roberto Mendes",
+  "telefone": "(98) 96543-2109",
+  "localizacao": "Terminal Cujupe"
+}
+
+### Exemplo 4.5 - Problema com funcionário (PRIORIDADE NORMAL)
+{
+  "categoria": "Funcionário",
+  "descricao": "Funcionário do terminal foi grosseiro e não soube informar horário da próxima saída. Precisa de treinamento em atendimento ao público.",
+  "nomeUsuario": "Sandra Lima",
+  "telefone": "(98) 95432-1098",
+  "email": "sandra.lima@email.com"
+}
+
+### Exemplo 4.6 - Infraestrutura (PRIORIDADE NORMAL)
+{
+  "categoria": "Infraestrutura",
+  "descricao": "O banheiro do terminal está em péssimas condições. Sem papel higiênico, vazamento nas torneiras e porta quebrada. Precisa de manutenção urgente.",
+  "nomeUsuario": "Lucas Ferreira",
+  "telefone": "(98) 94321-0987",
+  "localizacao": "Terminal Ponta da Espera - Banheiros"
+}
+
+### Exemplo 4.7 - Relato anônimo
+{
+  "categoria": "Outro",
+  "descricao": "O sistema de som do terminal não está funcionando. Não conseguimos ouvir os avisos sobre embarque e saída das embarcações."
+}
+
+### Exemplo 4.8 - Relato completo com todas as informações
+{
+  "categoria": "Atraso excessivo",
+  "descricao": "Chegamos ao terminal às 7h15 para trabalhar em São Luís. Já são 9h30 e ainda não conseguimos embarcar. São 3 embarcações paradas para manutenção simultânea e apenas 1 operando. Isso está causando atraso em nosso trabalho e prejuízo. Solicito providências urgentes e melhor planejamento das manutenções para não parar tantas embarcações ao mesmo tempo.",
+  "nomeUsuario": "Marcos Oliveira",
+  "telefone": "(98) 99999-0000",
+  "email": "marcos.oliveira@empresa.com",
+  "localizacao": "Terminal Cujupe - Fila de Embarque"
+}
+
+
+## ═══════════════════════════════════════════════════════════
+## 5. ENDPOINTS GET (Não precisam de Body)
+## ═══════════════════════════════════════════════════════════
+
+### 5.1 - Informações da API
+GET http://localhost:3000/
+
+### 5.2 - Configurações do sistema
+GET http://localhost:3000/config
+
+### 5.3 - Teoria de Filas (Documentação)
+GET http://localhost:3000/teoria-filas
+
+### 5.4 - Status das embarcações
+GET http://localhost:3000/embarcacoes/status
+
+### 5.5 - Listar todas as reservas
+GET http://localhost:3000/reservas
+
+### 5.6 - Listar reservas de uma data específica
+GET http://localhost:3000/reservas?data=2025-11-08
+
+### 5.7 - Listar todos os problemas
+GET http://localhost:3000/problemas
+
+### 5.8 - Filtrar problemas por status
+GET http://localhost:3000/problemas?status=aberto
+GET http://localhost:3000/problemas?status=em_andamento
+GET http://localhost:3000/problemas?status=resolvido
+
+### 5.9 - Filtrar problemas por prioridade
+GET http://localhost:3000/problemas?prioridade=alta
+GET http://localhost:3000/problemas?prioridade=média
+GET http://localhost:3000/problemas?prioridade=normal
+
+### 5.10 - Filtrar problemas por categoria
+GET http://localhost:3000/problemas?categoria=Segurança
+GET http://localhost:3000/problemas?categoria=Atraso%20excessivo
+
+### 5.11 - Filtrar com múltiplos parâmetros
+GET http://localhost:3000/problemas?status=aberto&prioridade=alta
+
+
+## ═══════════════════════════════════════════════════════════
+## 📝 COMO USAR NO THUNDER CLIENT
+## ═══════════════════════════════════════════════════════════
+
+1. Para endpoints POST:
+   - Selecione método: POST
+   - Cole a URL (ex: http://localhost:3000/relatar-problema)
+   - Vá na aba "Body"
+   - Selecione "JSON"
+   - Cole um dos exemplos acima
+   - Clique em "Send"
+
+2. Para endpoints GET:
+   - Selecione método: GET
+   - Cole a URL completa
+   - Clique em "Send"
+   - Não precisa de Body
+
+3. Headers necessários (Thunder Client adiciona automaticamente):
+   Content-Type: application/json
+
+
+## ═══════════════════════════════════════════════════════════
+## 🎯 TESTES RECOMENDADOS PARA APRESENTAÇÃO
+## ═══════════════════════════════════════════════════════════
+
+### Teste 1: Simulação básica
+POST http://localhost:3000/simular
+Body: {}
+
+### Teste 2: Comparação com reservas
+POST http://localhost:3000/simular/com-reservas
+Body: { "percentualReservas": 0.3 }
+
+### Teste 3: Status em tempo real
+GET http://localhost:3000/embarcacoes/status
+
+### Teste 4: Criar reserva
+POST http://localhost:3000/reserva
+Body: Use Exemplo 3.1
+
+### Teste 5: Relatar problema (DEMO DO FORMULÁRIO)
+POST http://localhost:3000/relatar-problema
+Body: Use Exemplo 4.1 ou 4.8
+
+### Teste 6: Ver problemas relatados
+GET http://localhost:3000/problemas
+
+### Teste 7: Ver teoria aplicada
+GET http://localhost:3000/teoria-filas
+
+
+## ═══════════════════════════════════════════════════════════
+## ⚠️ CATEGORIAS VÁLIDAS PARA PROBLEMAS
+## ═══════════════════════════════════════════════════════════
+
+Use EXATAMENTE uma destas categorias no campo "categoria":
+
+- "Embarcação com defeito"     (Prioridade: Alta)
+- "Segurança"                  (Prioridade: Alta)
+- "Atraso excessivo"           (Prioridade: Média)
+- "Fila desorganizada"         (Prioridade: Média)
+- "Funcionário"                (Prioridade: Normal)
+- "Infraestrutura"             (Prioridade: Normal)
+- "Outro"                      (Prioridade: Normal)
+
+OBS: Copie e cole exatamente como está acima para evitar erros!
+
+
+## ═══════════════════════════════════════════════════════════
+## 💡 DICAS
+## ═══════════════════════════════════════════════════════════
+
+✅ Sempre verifique se o servidor está rodando antes de testar
+✅ Use "npm start" para iniciar o servidor
+✅ O servidor roda em: http://localhost:3000
+✅ Guarde os protocolos dos problemas relatados
+✅ Os campos "telefone", "email" e "localizacao" são opcionais
+✅ O campo "nomeUsuario" pode ser "Anônimo"
+✅ Após relatar problema, use GET /problemas para ver ele listado

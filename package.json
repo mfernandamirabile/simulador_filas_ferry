@@ -1,0 +1,27 @@
+{
+  "name": "ferry-bot-backend",
+  "version": "1.0.0",
+  "description": "Backend para simulação de filas nos ferries de São Luís",
+  "main": "ferry-backend.js",
+  "scripts": {
+    "start": "node ferry-backend.js",
+    "dev": "nodemon ferry-backend.js",
+    "test": "node test-backend.js"
+  },
+  "keywords": [
+    "simulação",
+    "ferries",
+    "são luís",
+    "filas",
+    "api"
+  ],
+  "author": "Eduardo",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
